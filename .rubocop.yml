@@ -1,0 +1,71 @@
+AllCops:
+  TargetRubyVersion: 3.1
+  NewCops: enable
+  SuggestExtensions: false
+
+# The hand-written HTTP transport, retry/backoff logic and the multi-step
+# convert() flow are intrinsically a little long/branchy; readability, not a
+# line count, is the bar here. Coverage of these is the security + unit suites.
+Metrics/MethodLength:
+  Enabled: false
+Metrics/AbcSize:
+  Enabled: false
+Metrics/CyclomaticComplexity:
+  Enabled: false
+Metrics/PerceivedComplexity:
+  Enabled: false
+Metrics/ClassLength:
+  Enabled: false
+Metrics/ModuleLength:
+  Enabled: false
+Metrics/ParameterLists:
+  Enabled: false
+Metrics/BlockLength:
+  Exclude:
+    - "spec/**/*.rb"
+    - "*.gemspec"
+
+Layout/LineLength:
+  Max: 110
+
+# Value objects intentionally take many keyword args mirroring the wire schema.
+Naming/MethodParameterName:
+  AllowedNames: [io, id, to, a, b, e]
+
+Style/Documentation:
+  Enabled: false
+
+# Double quotes throughout, matching the code and the Python sibling's house style.
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+# The contract fixes wait(id, timeout_seconds, throw_on_failure=true) across every
+# SDK language; a boolean positional there is intentional, not a smell.
+Style/OptionalBooleanParameter:
+  Enabled: false
+
+# result.rb intentionally groups ConversionResult + FileDownload (mirrors the
+# Python sibling's result.py); the entry point re-opens the module by design.
+Style/OneClassPerFile:
+  Enabled: false
+
+# ConversionFailedError/ConversionTimeoutError take a Job (+ timeout), not a bare
+# message, so the `.new` form is clearer and consistent for both.
+Style/RaiseArgs:
+  Enabled: false
+
+# RSpec suites legitimately define fixture constants inside describe blocks.
+Lint/ConstantDefinitionInBlock:
+  Exclude:
+    - "spec/**/*.rb"
+
+# The two cops below assume a Ruby 3.x-only codebase. The runtime + specs are kept
+# parseable on the (EOL) Ruby that the local dev box ships so the suite can run
+# there too; CI covers the real 3.1+ matrix. `..-1` and an explicit Dir glob sort
+# are required for that older Ruby.
+Style/SlicingWithRange:
+  Enabled: false
+Lint/RedundantDirGlobSort:
+  Enabled: false

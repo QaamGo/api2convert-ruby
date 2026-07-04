@@ -1,0 +1,9 @@
+.git
+.github
+/pkg/
+/tmp/
+/coverage/
+/.bundle/
+*.gem
+Gemfile.lock
+.rspec_status
