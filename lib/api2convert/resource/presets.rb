@@ -23,15 +23,19 @@ module Api2Convert
       end
 
       def get(preset_id)
-        Model::Preset.from_hash(@transport.request("GET", "/presets/#{preset_id}"))
+        Model::Preset.from_hash(
+          @transport.request("GET", "/presets/#{Support::Data.encode_segment(preset_id)}")
+        )
       end
 
       def update(preset_id, payload)
-        Model::Preset.from_hash(@transport.request("PATCH", "/presets/#{preset_id}", payload))
+        Model::Preset.from_hash(
+          @transport.request("PATCH", "/presets/#{Support::Data.encode_segment(preset_id)}", payload)
+        )
       end
 
       def delete(preset_id)
-        @transport.request("DELETE", "/presets/#{preset_id}")
+        @transport.request("DELETE", "/presets/#{Support::Data.encode_segment(preset_id)}")
         nil
       end
     end

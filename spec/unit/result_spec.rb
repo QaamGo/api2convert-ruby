@@ -23,6 +23,29 @@ RSpec.describe Api2Convert::Result do
       end
     end
 
+    it "streams the body straight to disk on save (the download call buffers nothing)" do
+      client, sender = make_client
+      sender.add_raw(200, "STREAMED-TO-DISK")
+      Dir.mktmpdir do |dir|
+        target = File.join(dir, "out.bin")
+        expect(client.download(output).save(target)).to eq(target)
+        expect(File.binread(target)).to eq("STREAMED-TO-DISK")
+      end
+      # The transport streamed to the sink, so the Response handed back was empty.
+      expect(sender.last.follow_redirects).to be(true)
+    end
+
+    it "removes the partial file when the download fails mid-stream" do
+      client, sender = make_client
+      sender.add_stream_error(Api2Convert::NetworkError.new("stream died"), "PARTIAL-BYTES")
+      Dir.mktmpdir do |dir|
+        target = File.join(dir, "broken.bin")
+        expect { client.download(output).save(target) }
+          .to raise_error(Api2Convert::NetworkError, /stream died/)
+        expect(File.exist?(target)).to be(false)
+      end
+    end
+
     it "keeps the API filename when saving to a directory" do
       client, sender = make_client
       sender.add_raw(200, "DATA")

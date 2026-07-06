@@ -49,5 +49,18 @@ module Api2Convert
         poll_timeout: timeout_value
       )
     end
+
+    # Redacted representation — the API key is masked so it can never be printed
+    # in cleartext by `p config`, a logger, or an object dumped in a backtrace.
+    def inspect
+      "#<#{self.class.name} api_key=#{Support::Secret.mask(@api_key)} " \
+        "base_url=#{@base_url.inspect} timeout=#{@timeout} max_retries=#{@max_retries} " \
+        "poll_interval=#{@poll_interval} poll_max_interval=#{@poll_max_interval} " \
+        "poll_timeout=#{@poll_timeout}>"
+    end
+
+    def to_s
+      inspect
+    end
   end
 end

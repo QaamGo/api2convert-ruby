@@ -96,4 +96,28 @@ RSpec.describe "API resources" do
       expect(sender.last.url).to end_with("/contracts")
     end
   end
+
+  describe "path-segment encoding" do
+    it "percent-encodes a job id carrying reserved characters so it cannot escape its segment" do
+      client, sender = make_client
+      sender.add_json(200, "id" => "x", "status" => { "code" => "completed" })
+      client.jobs.get("a/b?c#d e")
+      path = sender.last.url.split("?").first
+      expect(path).to end_with("/jobs/a%2Fb%3Fc%23d%20e")
+    end
+
+    it "encodes a preset id in the path" do
+      client, sender = make_client
+      sender.add_json(200, "id" => "p", "name" => "n")
+      client.presets.get("../../contracts")
+      expect(sender.last.url).to end_with("/presets/..%2F..%2Fcontracts")
+    end
+
+    it "encodes both stats path segments (date and filter)" do
+      client, sender = make_client
+      sender.add_json(200, {})
+      client.stats.day("2026/07", "team a/b")
+      expect(sender.last.url).to end_with("/stats/day/2026%2F07/team%20a%2Fb")
+    end
+  end
 end

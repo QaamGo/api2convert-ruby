@@ -99,6 +99,17 @@ module Api2Convert
       nil
     end
 
+    # Redacted representation. The default `#inspect` would recurse into the
+    # transport and its config and dump the API key in cleartext, so it is
+    # overridden to surface only the (non-secret) base URL.
+    def inspect
+      "#<#{self.class.name} base_url=#{@transport.config.base_url.inspect}>"
+    end
+
+    def to_s
+      inspect
+    end
+
     private
 
     def start_conversion(source, to, options, category, callback, filename, download_password)

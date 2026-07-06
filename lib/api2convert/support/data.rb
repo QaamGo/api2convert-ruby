@@ -72,6 +72,18 @@ module Api2Convert
       def str_list(value)
         as_list(value).grep(String)
       end
+
+      # Percent-encode a value for use as a single URL path segment.
+      #
+      # A job/preset id or a stats date/filter is interpolated into the request
+      # path; a value carrying `/`, `?`, `#`, a space or any other reserved
+      # character (e.g. `all/../contracts`) must be encoded so it can never break
+      # out of its segment or forge a different path. Only the RFC 3986 unreserved
+      # set survives; everything else becomes `%XX` over the UTF-8 bytes (mirrors
+      # Node's `encodeURIComponent` / Go's `url.PathEscape`).
+      def encode_segment(value)
+        value.to_s.b.gsub(/[^A-Za-z0-9\-_.~]/n) { |byte| format("%%%02X", byte.ord) }
+      end
     end
   end
 end

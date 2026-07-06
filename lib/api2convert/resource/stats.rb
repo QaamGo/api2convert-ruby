@@ -12,17 +12,23 @@ module Api2Convert
 
       # +day+ format `yyyy-mm-dd`.
       def day(day, filter = "all")
-        @transport.request("GET", "/stats/day/#{day}/#{filter}")
+        @transport.request("GET", "/stats/day/#{seg(day)}/#{seg(filter)}")
       end
 
       # +month+ format `yyyy-mm`.
       def month(month, filter = "all")
-        @transport.request("GET", "/stats/month/#{month}/#{filter}")
+        @transport.request("GET", "/stats/month/#{seg(month)}/#{seg(filter)}")
       end
 
       # +year+ format `yyyy`.
       def year(year, filter = "all")
-        @transport.request("GET", "/stats/year/#{year}/#{filter}")
+        @transport.request("GET", "/stats/year/#{seg(year)}/#{seg(filter)}")
+      end
+
+      private
+
+      def seg(value)
+        Support::Data.encode_segment(value)
       end
     end
   end

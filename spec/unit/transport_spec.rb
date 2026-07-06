@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "stringio"
+
 RSpec.describe Api2Convert::Http::Transport do
   describe "authenticated requests" do
     it "sends the API key in the X-Oc-Api-Key header and JSON content type on a body" do
@@ -140,6 +142,40 @@ RSpec.describe Api2Convert::Http::Transport do
       expect { client.jobs.get("j") }.to raise_error(Api2Convert::RateLimitError) do |error|
         expect(error.retry_after).to be_nil
       end
+    end
+  end
+
+  describe "download" do
+    def transport_for(client)
+      client.instance_variable_get(:@transport)
+    end
+
+    it "streams a successful body into the sink and returns nil (no whole-body buffer)" do
+      client, sender = make_client
+      sender.add_raw(200, "STREAMED-BYTES")
+      sink = StringIO.new
+      result = transport_for(client).download("https://dl.example/x", {}, sink: sink)
+      expect(result).to be_nil
+      expect(sink.string).to eq("STREAMED-BYTES")
+    end
+
+    it "buffers into memory and returns the body when no sink is given" do
+      client, sender = make_client
+      sender.add_raw(200, "BUFFERED-BYTES")
+      expect(transport_for(client).download("https://dl.example/x", {})).to eq("BUFFERED-BYTES")
+    end
+
+    it "raises NetworkError on an unexpected 3xx (never writes a redirect as the file)" do
+      client, sender = make_client
+      sender.add_raw(302, "<html>redirect</html>", "Location" => "https://evil.example/steal")
+      sink = StringIO.new
+      expect do
+        transport_for(client).download(
+          "https://dl.example/x", { "X-Oc-Download-Password" => "pw" },
+          follow_redirects: false, sink: sink
+        )
+      end.to raise_error(Api2Convert::NetworkError, /HTTP 302/)
+      expect(sink.string).to eq("") # the redirect body never reached the sink
     end
   end
 end

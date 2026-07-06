@@ -20,6 +20,7 @@ require_relative "api2convert/version"
 require_relative "api2convert/errors"
 require_relative "api2convert/config"
 require_relative "api2convert/support/data"
+require_relative "api2convert/support/secret"
 require_relative "api2convert/job_status"
 require_relative "api2convert/input_type"
 

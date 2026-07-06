@@ -48,6 +48,31 @@ RSpec.describe "security", :security do
       expect(sender.last.header("X-Oc-Api-Key")).to eq(secret)
     end
 
+    it "masks secrets in #inspect / #to_s so `p client` never prints them in cleartext" do
+      key = "sk_live_super_secret_value_123"
+      password = "dl_password_secret_987"
+      client, = make_client({}, key)
+      config = Api2Convert::Config.create(key)
+      transport = client.instance_variable_get(:@transport)
+      download = client.download(output, password)
+      result = Api2Convert::Result::ConversionResult.new(
+        Api2Convert::Model::Job.from_hash("id" => "j", "status" => { "code" => "completed" }),
+        transport, 0, password
+      )
+
+      dumps = [
+        client.inspect, client.to_s, config.inspect, config.to_s,
+        transport.inspect, download.inspect, result.inspect
+      ]
+      dumps.each do |text|
+        expect(text).not_to include(key)
+        expect(text).not_to include(password)
+      end
+      # The key is still represented (redacted) so a dump stays useful for support.
+      expect(config.inspect).to include("[FILTERED")
+      expect(transport.inspect).to include("[FILTERED")
+    end
+
     it "never places the API key in the URL or query string" do
       key = "sk_live_in_url_check"
       client, sender = make_client({}, key)

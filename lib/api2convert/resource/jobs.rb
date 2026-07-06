@@ -23,7 +23,7 @@ module Api2Convert
       end
 
       def get(job_id)
-        Model::Job.from_hash(@transport.request("GET", "/jobs/#{job_id}"))
+        Model::Job.from_hash(@transport.request("GET", "/jobs/#{Support::Data.encode_segment(job_id)}"))
       end
 
       # List the current key's jobs (paginated, 50 per page).
@@ -35,7 +35,9 @@ module Api2Convert
       end
 
       def update(job_id, payload)
-        Model::Job.from_hash(@transport.request("PATCH", "/jobs/#{job_id}", payload))
+        Model::Job.from_hash(
+          @transport.request("PATCH", "/jobs/#{Support::Data.encode_segment(job_id)}", payload)
+        )
       end
 
       # Start processing a staged job (`process => true`).
@@ -45,14 +47,16 @@ module Api2Convert
 
       # Cancel a job (whether staged or processing).
       def cancel(job_id)
-        @transport.request("DELETE", "/jobs/#{job_id}")
+        @transport.request("DELETE", "/jobs/#{Support::Data.encode_segment(job_id)}")
         nil
       end
 
       # Attach an input by descriptor, e.g. a remote URL:
       # `add_input(job_id, { "type" => "remote", "source" => "https://..." })`.
       def add_input(job_id, descriptor)
-        Model::InputFile.from_hash(@transport.request("POST", "/jobs/#{job_id}/input", descriptor))
+        Model::InputFile.from_hash(
+          @transport.request("POST", "/jobs/#{Support::Data.encode_segment(job_id)}/input", descriptor)
+        )
       end
 
       # Upload a local file (path or IO) to the job's upload server.
@@ -90,7 +94,7 @@ module Api2Convert
 
       # Outputs produced by the job (use {#get} or {#wait} first).
       def outputs(job_id)
-        rows = @transport.request("GET", "/jobs/#{job_id}/output")
+        rows = @transport.request("GET", "/jobs/#{Support::Data.encode_segment(job_id)}/output")
         hashes(rows).map { |row| Model::OutputFile.from_hash(row) }
       end
 

@@ -24,7 +24,11 @@ module Api2Convert
       end
 
       # Stream the file to disk. +path_or_dir+ is a file path, or a directory (the
-      # API filename is used). Returns the path written to.
+      # API filename is used). The body is streamed straight to the file
+      # chunk-by-chunk (never buffered whole in memory), so an arbitrarily large
+      # output cannot exhaust memory. A mid-stream failure removes the partial file
+      # so a truncated download never masquerades as a complete result. Returns the
+      # path written to.
       def save(path_or_dir, download_password = nil)
         target = resolve_target(path_or_dir.to_s)
         parent = File.dirname(target)
@@ -35,27 +39,52 @@ module Api2Convert
           raise Api2Convert::Error, "Could not create directory: #{parent}"
         end
 
-        data = fetch(download_password)
-        begin
-          File.binwrite(target, data)
-        rescue SystemCallError
-          raise Api2Convert::Error, "Could not open file for writing: #{target}"
-        end
+        stream_to_file(target, resolve_password(download_password))
         target
       end
 
-      # Download the file and return its contents.
+      # Download the file and return its contents. This buffers the whole body in
+      # memory by design — use {#save} for a large file to stream it to disk.
       def contents(download_password = nil)
-        fetch(download_password)
+        password = resolve_password(download_password)
+        # A passwordless download follows storage redirects; a password-protected
+        # one must not (the X-Oc-Download-Password header could leak on a redirect).
+        @transport.download(@output.uri, headers(password), follow_redirects: password.nil?)
+      end
+
+      # Redacted representation — the remembered download password is masked.
+      def inspect
+        "#<#{self.class.name} url=#{@output.uri.inspect} " \
+          "download_password=#{Support::Secret.mask(@download_password)}>"
+      end
+
+      def to_s
+        inspect
       end
 
       private
 
-      def fetch(download_password)
-        password = download_password.nil? ? @download_password : download_password
-        # A passwordless download follows storage redirects; a password-protected
-        # one must not (the X-Oc-Download-Password header could leak on a redirect).
-        @transport.download(@output.uri, headers(password), follow_redirects: password.nil?)
+      def stream_to_file(target, password)
+        success = false
+        begin
+          File.open(target, "wb") do |file|
+            @transport.download(
+              @output.uri, headers(password), follow_redirects: password.nil?, sink: file
+            )
+            success = true
+          end
+        rescue SystemCallError
+          raise Api2Convert::Error, "Could not open file for writing: #{target}"
+        ensure
+          # Any failure (open error, network break, a refused-redirect NetworkError,
+          # a mid-stream break) leaves a partial or empty file — remove it so a
+          # truncated download can never masquerade as a complete result.
+          FileUtils.rm_f(target) unless success
+        end
+      end
+
+      def resolve_password(download_password)
+        download_password.nil? ? @download_password : download_password
       end
 
       def headers(password)
@@ -140,6 +169,16 @@ module Api2Convert
       # A {FileDownload} for a specific output (defaults to the selected one).
       def download(output_file = nil)
         FileDownload.new(@transport, output_file.nil? ? output : output_file, @download_password)
+      end
+
+      # Redacted representation — the remembered download password is masked.
+      def inspect
+        "#<#{self.class.name} job=#{@job.id.inspect} outputs=#{@job.output.length} " \
+          "download_password=#{Support::Secret.mask(@download_password)}>"
+      end
+
+      def to_s
+        inspect
       end
     end
   end

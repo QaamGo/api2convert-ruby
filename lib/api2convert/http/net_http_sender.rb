@@ -3,6 +3,7 @@
 require "net/http"
 require "uri"
 require "openssl"
+require "timeout"
 
 module Api2Convert
   module Http
@@ -22,6 +23,21 @@ module Api2Convert
       MAX_REDIRECTS = 5
       REDIRECT_CODES = [301, 302, 303, 307, 308].freeze
 
+      # Errors worth surfacing when they strike mid-stream (after bytes have
+      # already reached the sink). They are re-raised as {NetworkError} so the
+      # transport does NOT retry — replaying would re-stream the whole body and
+      # append it to the partial file, silently corrupting the download.
+      #
+      # This MUST stay a superset of {Transport::TRANSPORT_ERRORS}: any transport
+      # error the retry loop would otherwise catch (notably OpenSSL::SSL::SSLError
+      # on a truncated/reset TLS body) has to be intercepted here first, or an
+      # idempotent streamed GET gets retried and the file is corrupted.
+      STREAM_ERRORS = [
+        IOError, EOFError, SocketError, SystemCallError, Timeout::Error,
+        OpenSSL::SSL::SSLError, URI::Error,
+        Net::OpenTimeout, Net::ReadTimeout, Net::HTTPBadResponse, Net::ProtocolError
+      ].freeze
+
       METHOD_CLASSES = {
         "GET" => Net::HTTP::Get,
         "HEAD" => Net::HTTP::Head,
@@ -40,34 +56,58 @@ module Api2Convert
         perform(
           request.method, request.url, request.headers,
           request.body, request.body_stream, request.content_length,
-          request.follow_redirects, 0
+          request.follow_redirects, request.response_sink, 0
         )
       end
 
       private
 
-      def perform(method, url, headers, body, body_stream, content_length, follow, hops)
+      def perform(method, url, headers, body, body_stream, content_length, follow, sink, hops)
         uri = URI.parse(url)
         raise Api2Convert::NetworkError, "Unsupported or non-HTTP URL: #{url}" unless uri.is_a?(URI::HTTP)
 
         http = build_http(uri)
         req = build_request(method, uri, headers, body, body_stream, content_length)
-        res = http.start { |conn| conn.request(req) }
-        status = res.code.to_i
 
-        if follow && REDIRECT_CODES.include?(status) && hops < MAX_REDIRECTS
-          location = res["location"]
-          unless location.nil? || location.empty?
-            # Re-issue as a bare GET carrying only non-secret headers, so no
-            # X-Oc-* secret header is ever forwarded to the redirect target.
-            safe = {}
-            %w[Accept User-Agent].each { |k| safe[k] = headers[k] unless headers[k].nil? }
-            next_url = URI.join(url, location).to_s
-            return perform("GET", next_url, safe, nil, nil, nil, follow, hops + 1)
+        redirect_to = nil
+        result = nil
+        http.start do |conn|
+          conn.request(req) do |res|
+            status = res.code.to_i
+            if follow && REDIRECT_CODES.include?(status) && hops < MAX_REDIRECTS &&
+               !res["location"].to_s.empty?
+              redirect_to = res["location"]
+            elsif sink && status >= 200 && status < 300
+              # Stream the success body straight to the sink — never buffered whole
+              # in memory — and hand back an empty-body Response.
+              stream_body(res, sink)
+              result = to_response(res, "")
+            else
+              result = to_response(res, res.body || "")
+            end
           end
         end
 
-        to_response(res)
+        if redirect_to
+          # Re-issue as a bare GET carrying only non-secret headers, so no X-Oc-*
+          # secret header is ever forwarded to the redirect target.
+          safe = {}
+          %w[Accept User-Agent].each { |k| safe[k] = headers[k] unless headers[k].nil? }
+          next_url = URI.join(url, redirect_to).to_s
+          return perform("GET", next_url, safe, nil, nil, nil, follow, sink, hops + 1)
+        end
+
+        result
+      end
+
+      def stream_body(res, sink)
+        res.read_body { |chunk| sink.write(chunk) }
+      rescue *STREAM_ERRORS => e
+        # A failure once bytes have flowed to the sink must not be retried: a replay
+        # would append to a partial file and corrupt it. Raise a NetworkError (not a
+        # retryable transport error) so the transport surfaces it directly and the
+        # caller can delete the partial target.
+        raise Api2Convert::NetworkError, "Download stream failed: #{e.message}"
       end
 
       def build_http(uri)
@@ -98,10 +138,10 @@ module Api2Convert
         req
       end
 
-      def to_response(res)
+      def to_response(res, body)
         headers = {}
         res.each_header { |key, value| headers[key.downcase] = value }
-        Response.new(res.code.to_i, headers, res.body || "", res.message.to_s)
+        Response.new(res.code.to_i, headers, body, res.message.to_s)
       end
     end
   end

@@ -59,6 +59,14 @@ class FakeHttpSender
     self
   end
 
+  # Queue a download that starts streaming (writes +partial+ to the sink) and then
+  # fails mid-stream, mirroring the real sender wrapping a mid-stream break as a
+  # NetworkError (a non-retryable failure that leaves a partial file behind).
+  def add_stream_error(exception, partial = "")
+    @queue << { stream_error: exception, partial: partial }
+    self
+  end
+
   def last
     @requests.last
   end
@@ -77,8 +85,22 @@ class FakeHttpSender
     entry = @queue.shift
     raise entry[:error] if entry[:error]
 
+    sink = request.response_sink
+    if entry[:stream_error]
+      sink&.write(entry[:partial].to_s)
+      raise entry[:stream_error]
+    end
+
+    status = entry[:status]
     normalized = {}
     (entry[:headers] || {}).each { |key, value| normalized[key.to_s.downcase] = value }
-    Api2Convert::Http::Response.new(entry[:status], normalized, entry[:body] || "", "")
+    body = entry[:body] || ""
+    # Mirror the real sender: a successful body streams straight to the sink and
+    # the returned Response carries an empty body.
+    if sink && status.is_a?(Integer) && status >= 200 && status < 300
+      sink.write(body)
+      body = ""
+    end
+    Api2Convert::Http::Response.new(status, normalized, body, "")
   end
 end

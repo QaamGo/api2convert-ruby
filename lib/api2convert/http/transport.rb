@@ -42,6 +42,17 @@ module Api2Convert
         @rng = rng || -> { Kernel.rand }
       end
 
+      # Redacted representation — the default `#inspect` would dump the config's
+      # API key in cleartext, so it is overridden to mask it.
+      def inspect
+        "#<#{self.class.name} base_url=#{@config.base_url.inspect} " \
+          "api_key=#{Support::Secret.mask(@config.api_key)}>"
+      end
+
+      def to_s
+        inspect
+      end
+
       # Sleep for (at least) +seconds+ with a small upward jitter. Used by job
       # polling; the jitter keeps a fleet from polling in lockstep.
       def pause(seconds)
@@ -161,20 +172,34 @@ module Api2Convert
         end
       end
 
-      # Download a (self-contained) URL and return its bytes. Used for output
-      # downloads — these URLs need no API key.
+      # Download a (self-contained) URL. Used for output downloads — these URLs
+      # need no API key.
+      #
+      # When +sink+ is an IO-like object (responds to `write`), the body is streamed
+      # to it chunk-by-chunk and +nil+ is returned, so a large file never has to be
+      # buffered whole in memory. With no +sink+ the body is buffered and returned
+      # (the in-memory `contents` path).
       #
       # +follow_redirects+ is true for a passwordless download (storage URLs
       # legitimately redirect, and no secret is carried) and false when a
       # download-password header is present (so it can never leak on a redirect).
-      def download(uri, headers = {}, follow_redirects: true)
+      def download(uri, headers = {}, follow_redirects: true, sink: nil)
         request_headers = headers.nil? ? {} : headers
         build = lambda do
-          Request.new(method: "GET", url: uri, headers: request_headers.dup)
+          Request.new(method: "GET", url: uri, headers: request_headers.dup, response_sink: sink)
         end
         response = send_request(build, replayable: true, follow_redirects: follow_redirects)
         ensure_successful(response)
-        response.body
+        # A no-follow download that resolved to a 3xx (e.g. a password-protected
+        # download whose redirect the policy refused to follow) must never be
+        # written as the file: the body is the redirect page, not the content.
+        # Guard the success path to 2xx so a 3xx can never silently corrupt output.
+        unless (200..299).cover?(response.status)
+          raise NetworkError,
+                "Unexpected HTTP #{response.status} on download: refusing to write a " \
+                "non-2xx (redirect) response as file content."
+        end
+        sink.nil? ? response.body : nil
       end
 
       # Build a request object without sending it (used by the uploader, which
