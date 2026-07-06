@@ -1,5 +1,17 @@
 # frozen_string_literal: true
 
+# Provides `rake build` and `rake release` (build → tag → gem push) from the
+# gemspec. The tag-triggered Release workflow (.github/workflows/release.yml)
+# drives `rake release` via rubygems/release-gem; on a tag-triggered run Bundler
+# detects the tag already exists and only pushes the gem to RubyGems.org.
+# Guarded so the test tasks still load where Bundler is unavailable.
+begin
+  require "bundler/gem_tasks"
+rescue LoadError
+  # Bundler not installed — `rake build`/`rake release` are unavailable, but the
+  # lint/spec tasks below still work.
+end
+
 require "rspec/core/rake_task"
 
 # `rake spec` runs the offline unit suite only — the fast guardrail.

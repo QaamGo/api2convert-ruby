@@ -1,0 +1,58 @@
+name: Release
+
+# Publishes the gem to RubyGems.org when a version tag is pushed
+# (e.g. `git push origin v10.2.0`).
+#
+# Auth is keyless via RubyGems Trusted Publishing (OIDC): no RUBYGEMS_API_KEY is
+# stored anywhere. GitHub Actions mints a short-lived OIDC token that
+# rubygems/release-gem exchanges for a short-lived, gem-scoped RubyGems token.
+# This mirrors the Python SDK's PyPI Trusted Publishing and satisfies the
+# gemspec's `rubygems_mfa_required => "true"` (a trusted-publishing push is a
+# verified push, so it is accepted without an OTP).
+#
+# One-time setup on rubygems.org (owner action, cannot be automated): register a
+# trusted publisher (or a "pending" one to claim the name) for gem `api2convert`
+# pointing at repo QaamGo/api2convert-ruby, workflow `release.yml`, environment
+# `release`.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Publish to RubyGems.org
+    runs-on: ubuntu-latest
+    environment: release # protected GitHub Environment — must match the rubygems.org trusted-publisher config
+    permissions:
+      id-token: write # OIDC token for Trusted Publishing (mandatory; no stored secret)
+      contents: write # release-gem may push the git tag ref (a no-op here since the tag already exists)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Assert the tag matches Api2Convert::VERSION
+        run: |
+          GEM_VERSION="$(ruby -Ilib -rapi2convert/version -e 'print Api2Convert::VERSION')"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$GEM_VERSION" != "$TAG_VERSION" ]; then
+            echo "Api2Convert::VERSION ($GEM_VERSION) != tag ($TAG_VERSION)" >&2
+            exit 1
+          fi
+
+      - name: Guardrail — lint + unit + security suites
+        run: bundle exec rake check
+
+      # Configures OIDC credentials, then runs `bundle exec rake release`
+      # (builds the gem and `gem push`es it to RubyGems.org).
+      - uses: rubygems/release-gem@v1

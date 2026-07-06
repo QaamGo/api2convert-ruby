@@ -21,7 +21,7 @@ Gem::Specification.new do |spec|
     "documentation_uri" => "https://www.api2convert.com/documentation",
     "source_code_uri" => "https://github.com/QaamGo/api2convert-ruby",
     "bug_tracker_uri" => "https://github.com/QaamGo/api2convert-ruby/issues",
-    "changelog_uri" => "https://github.com/QaamGo/api2convert-ruby/blob/master/docs/CHANGELOG.md",
+    "changelog_uri" => "https://github.com/QaamGo/api2convert-ruby/blob/main/docs/CHANGELOG.md",
     "rubygems_mfa_required" => "true"
   }
 
