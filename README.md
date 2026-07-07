@@ -150,6 +150,23 @@ Live conformance tests hit the real API and are skipped unless a key is present:
 $ API2CONVERT_API_KEY=<your key> bundle exec rake spec:live
 ```
 
+The [live conformance suite](spec/live/conformance_spec.rb) doubles as an
+executable, end-to-end tour of the SDK — each example is a self-contained,
+idiomatic usage snippet:
+
+1. **Convert a remote URL** — the one-call happy path.
+2. **Upload and convert a local file** — the multipart upload path.
+3. **Convert with options** — apply target-specific conversion options.
+4. **Discover the catalog** — list conversions and option schemas.
+5. **Drive the job lifecycle by hand** — create → add input → start → wait → inspect.
+6. **Handle a validation error** — an unknown target is a typed error.
+7. **Handle an authentication error** — a bad key is typed and never leaked.
+
+It runs automatically against the real API on every release tag (see
+`.github/workflows/live-conformance.yml`), so a published version is always
+verified end to end. Runnable single-purpose examples live in
+[`examples/`](examples/).
+
 If your machine's Ruby is older than the gem targets, run the guardrail on a
 supported Ruby with the bundled `Dockerfile`:
 
