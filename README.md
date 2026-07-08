@@ -1,5 +1,10 @@
 # API2Convert Ruby SDK
 
+[![CI](https://github.com/QaamGo/api2convert-ruby/actions/workflows/ci.yml/badge.svg)](https://github.com/QaamGo/api2convert-ruby/actions/workflows/ci.yml)
+[![Gem Version](https://img.shields.io/gem/v/api2convert)](https://rubygems.org/gems/api2convert)
+![Ruby](https://img.shields.io/badge/ruby-%E2%89%A5%203.1-red)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 Official Ruby SDK for the [API2Convert](https://www.api2convert.com) file-conversion API.
 Convert, compress and transform images, documents, audio, video, ebooks, archives and CAD —
 and run operations like OCR, merge, thumbnail and website capture — in one line of code.
