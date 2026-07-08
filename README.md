@@ -150,22 +150,43 @@ Live conformance tests hit the real API and are skipped unless a key is present:
 $ API2CONVERT_API_KEY=<your key> bundle exec rake spec:live
 ```
 
-The [live conformance suite](spec/live/conformance_spec.rb) doubles as an
-executable, end-to-end tour of the SDK — each example is a self-contained,
-idiomatic usage snippet:
+Each guide has a runnable, self-contained example under [`examples/`](examples/),
+and the [live conformance suite](spec/live/conformance_spec.rb) mirrors every one
+of them (same operation, plus assertions) so a published version is always
+verified end to end. It runs automatically against the real API on every release
+tag (see `.github/workflows/live-conformance.yml`).
 
-1. **Convert a remote URL** — the one-call happy path.
-2. **Upload and convert a local file** — the multipart upload path.
-3. **Convert with options** — apply target-specific conversion options.
-4. **Discover the catalog** — list conversions and option schemas.
-5. **Drive the job lifecycle by hand** — create → add input → start → wait → inspect.
-6. **Handle a validation error** — an unknown target is a typed error.
-7. **Handle an authentication error** — a bad key is typed and never leaked.
+| # | Example | What it shows |
+|---|---------|---------------|
+| 1 | [`quickstart.rb`](examples/quickstart.rb) | Convert a remote URL, fetch the job, download the output |
+| 2 | [`convert_files.rb`](examples/convert_files.rb) | Browse the conversions catalog, then convert |
+| 3 | [`uploading_files.rb`](examples/uploading_files.rb) | One-call upload + convert of a local file |
+| 4 | [`job_lifecycle.rb`](examples/job_lifecycle.rb) | Drive create → add input → start → wait → outputs by hand |
+| 5 | [`add_watermark.rb`](examples/add_watermark.rb) | Stamp a PDF with an image (two remote inputs) |
+| 6 | [`create_thumbnails.rb`](examples/create_thumbnails.rb) | Render a thumbnail of the first PDF page |
+| 7 | [`compress_files.rb`](examples/compress_files.rb) | Compress an image with the compress operation |
+| 8 | [`create_archives.rb`](examples/create_archives.rb) | Bundle remote files into a ZIP |
+| 9 | [`create_hashes.rb`](examples/create_hashes.rb) | Compute a file's SHA-256 checksum |
+| 10 | [`extract_assets.rb`](examples/extract_assets.rb) | Extract embedded assets from a document |
+| 11 | [`file_analysis.rb`](examples/file_analysis.rb) | Extract file metadata as JSON |
+| 12 | [`compare_files.rb`](examples/compare_files.rb) | Diff two images with compare-image |
+| 13 | [`capture_website.rb`](examples/capture_website.rb) | Screenshot a page with the screenshot engine |
+| 14 | [`audio_operations.rb`](examples/audio_operations.rb) | Re-encode audio to AAC |
+| 15 | [`image_operations.rb`](examples/image_operations.rb) | Resize an image |
+| 16 | [`webhooks.rb`](examples/webhooks.rb) | Start an async job with a callback URL |
+| 17 | [`presets.rb`](examples/presets.rb) | List saved conversion presets |
+| 18 | [`statistics.rb`](examples/statistics.rb) | Read monthly API usage |
+| 19 | [`rate-limits.rb`](examples/rate-limits.rb) | Inspect the account's contracts |
+| 20 | [`authentication.rb`](examples/authentication.rb) | Verify the API key by listing jobs |
 
-It runs automatically against the real API on every release tag (see
-`.github/workflows/live-conformance.yml`), so a published version is always
-verified end to end. Runnable single-purpose examples live in
-[`examples/`](examples/).
+A companion [`webhook.rb`](examples/webhook.rb) is a tiny Rack receiver that
+verifies the callback signature — the other side of example 16.
+
+Run any example with your key in the environment:
+
+```console
+$ API2CONVERT_API_KEY=<your key> ruby -Ilib examples/quickstart.rb
+```
 
 If your machine's Ruby is older than the gem targets, run the guardrail on a
 supported Ruby with the bundled `Dockerfile`:
