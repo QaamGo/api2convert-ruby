@@ -125,6 +125,15 @@ module Api2Convert
       def interpret(response)
         ensure_successful(response)
 
+        # Every API request rides the no-follow path (secrets travel in X-Oc-* headers), so a 3xx
+        # passes ensure_successful (status < 400) but was deliberately not followed; decoding its
+        # body would yield an empty model. Surface it as a typed error instead.
+        status = response.status
+        if status >= 300 && status < 400
+          raise NetworkError, "API2Convert returned an unexpected redirect (HTTP #{status}); " \
+                              "the request was not followed."
+        end
+
         raw = response.body
         return {} if raw.nil? || raw.empty?
 

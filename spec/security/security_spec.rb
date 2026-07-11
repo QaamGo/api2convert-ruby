@@ -94,11 +94,8 @@ RSpec.describe "security", :security do
       api = start_server { |_headers| { status: 302, headers: { "Location" => "#{evil.url}/steal" } } }
 
       client = real_client(base_url: "#{api.url}/v2")
-      begin
-        client.jobs.get("j") # the un-followed 302 yields no usable body
-      rescue Api2Convert::Error
-        nil
-      end
+      # An authenticated 3xx is surfaced as a typed error, not silently empty.
+      expect { client.jobs.get("j") }.to raise_error(Api2Convert::NetworkError)
 
       expect(evil.hits).to eq(0)
       expect(api.hits).to eq(1)
