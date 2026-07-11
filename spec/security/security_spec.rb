@@ -2,6 +2,7 @@
 
 require "json"
 require "openssl"
+require "socket"
 require "stringio"
 require "tmpdir"
 
@@ -169,6 +170,69 @@ RSpec.describe "security", :security do
     it "surfaces a malformed API-supplied download URI as a NetworkError" do
       expect { real_client.download(output("uri" => "https://exa mple.com/a b c")).contents }
         .to raise_error(Api2Convert::NetworkError)
+    end
+  end
+
+  describe "streaming timeout semantics (real loopback)" do
+    # A slow-but-steady streamed download must NOT be aborted by the request
+    # timeout. Net::HTTP's read_timeout is per-read-block (not a whole-transfer
+    # cap), so a body that trickles in over a span far exceeding the timeout still
+    # completes as long as no single gap between chunks stalls past it. This pins
+    # that the streamed body is bounded only by inter-chunk stalls, never a total.
+    it "does not cap a slow streamed download whose total transfer exceeds the timeout" do
+      # 4 chunks, 0.4s apart -> ~1.6s total transfer, each gap well under the 1s
+      # timeout. A whole-transfer timeout would abort this; a per-read one must not.
+      port, closer = start_trickle_server(%w[AA BB CC DD], gap: 0.4)
+      client = Api2Convert::Client.new(
+        "secret-key",
+        max_retries: 0, timeout: 1, sleeper: ->(_seconds) {}, rng: -> { 0.0 }
+      )
+
+      Dir.mktmpdir do |dir|
+        target = File.join(dir, "trickled.bin")
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        client.download(output("uri" => "http://127.0.0.1:#{port}/x")).save(target)
+        elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+        expect(File.binread(target)).to eq("AABBCCDD")
+        expect(elapsed).to be > 1.0 # the transfer genuinely outlasted the timeout
+      end
+    ensure
+      closer&.call
+    end
+
+    # A raw trickling HTTP/1.1 server: sends the status + Content-Length, then
+    # dribbles the body one chunk per +gap+ seconds. Returns [port, closer].
+    def start_trickle_server(chunks, gap:)
+      server = TCPServer.new("127.0.0.1", 0)
+      port = server.addr[1]
+      thread = Thread.new do
+        conn = server.accept
+        # Drain the request line + headers up to the blank separator line.
+        while (line = conn.gets)
+          break if ["\r\n", "\n"].include?(line)
+        end
+        conn.write("HTTP/1.1 200 OK\r\nContent-Length: #{chunks.join.bytesize}\r\n" \
+                   "Connection: close\r\n\r\n")
+        conn.flush
+        chunks.each do |chunk|
+          sleep(gap)
+          conn.write(chunk)
+          conn.flush
+        end
+        conn.close
+      rescue StandardError
+        nil
+      end
+      closer = lambda do
+        begin
+          server.close
+        rescue StandardError
+          nil
+        end
+        thread.kill
+      end
+      [port, closer]
     end
   end
 

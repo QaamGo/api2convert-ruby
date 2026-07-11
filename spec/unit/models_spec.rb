@@ -65,6 +65,22 @@ RSpec.describe "model hydration" do
       expect(described_class.nullable_int("nope")).to be_nil
     end
 
+    it "preserves arbitrarily large integers without overflow or precision loss" do
+      # Ruby integers are arbitrary-precision, so a huge file size hydrates exactly
+      # (no fixed-width overflow to wrap or saturate against — unlike Java/.NET).
+      expect(described_class.nullable_int(10**19)).to eq(10_000_000_000_000_000_000)
+      expect(described_class.nullable_int("9223372036854775808")).to eq(9_223_372_036_854_775_808)
+    end
+
+    it "returns nil (never raises) for a non-finite numeric string" do
+      # A numeric string that overflows Float to +/-Infinity ("1e400") must fall back
+      # to nil, not crash with FloatDomainError — the helper never raises on a payload.
+      expect(described_class.nullable_int("1e400")).to be_nil
+      expect(described_class.nullable_int("-1e400")).to be_nil
+      expect(described_class.nullable_int(Float::INFINITY)).to be_nil
+      expect(described_class.nullable_int(Float::NAN)).to be_nil
+    end
+
     it "reduces a JSON object to its values in as_list" do
       expect(described_class.as_list("a" => 1, "b" => 2)).to contain_exactly(1, 2)
       expect(described_class.as_list("scalar")).to eq([])

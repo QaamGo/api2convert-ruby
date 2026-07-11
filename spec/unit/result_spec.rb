@@ -43,6 +43,33 @@ RSpec.describe Api2Convert::Result do
         expect { client.download(output).save(target) }
           .to raise_error(Api2Convert::NetworkError, /stream died/)
         expect(File.exist?(target)).to be(false)
+        # The sibling temp file must be cleaned up too (no `.part` litter left behind).
+        expect(Dir.children(dir)).to be_empty
+      end
+    end
+
+    it "types a mid-stream read failure as a NetworkError, not a filesystem error" do
+      client, sender = make_client
+      sender.add_stream_error(Api2Convert::NetworkError.new("stream died"), "PARTIAL-BYTES")
+      Dir.mktmpdir do |dir|
+        # A read fault part-way through streaming is a transport error — never
+        # mislabeled "Could not write file" — so a retrying caller can tell the two apart.
+        expect { client.download(output).save(File.join(dir, "out.bin")) }
+          .to raise_error(Api2Convert::NetworkError)
+      end
+    end
+
+    it "leaves a pre-existing complete file untouched when the download fails mid-stream" do
+      # Temp-file + atomic rename means a mid-stream failure must not truncate or
+      # destroy a previously-complete file at the target path.
+      client, sender = make_client
+      sender.add_stream_error(Api2Convert::NetworkError.new("stream died"), "PARTIAL-BYTES")
+      Dir.mktmpdir do |dir|
+        target = File.join(dir, "result.pdf")
+        File.binwrite(target, "PREEXISTING COMPLETE FILE")
+        expect { client.download(output).save(target) }
+          .to raise_error(Api2Convert::NetworkError, /stream died/)
+        expect(File.binread(target)).to eq("PREEXISTING COMPLETE FILE")
       end
     end
 

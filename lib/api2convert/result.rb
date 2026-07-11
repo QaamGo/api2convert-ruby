@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require "tempfile"
 
 module Api2Convert
   module Result
@@ -24,11 +25,11 @@ module Api2Convert
       end
 
       # Stream the file to disk. +path_or_dir+ is a file path, or a directory (the
-      # API filename is used). The body is streamed straight to the file
-      # chunk-by-chunk (never buffered whole in memory), so an arbitrarily large
-      # output cannot exhaust memory. A mid-stream failure removes the partial file
-      # so a truncated download never masquerades as a complete result. Returns the
-      # path written to.
+      # API filename is used). The body is streamed chunk-by-chunk to a sibling temp
+      # file (never buffered whole in memory), then atomically renamed over the
+      # target only after a clean write+close — so an arbitrarily large output cannot
+      # exhaust memory and a mid-stream failure never truncates the target nor
+      # destroys a pre-existing complete file at that path. Returns the path written.
       def save(path_or_dir, download_password = nil)
         target = resolve_target(path_or_dir.to_s)
         parent = File.dirname(target)
@@ -65,22 +66,52 @@ module Api2Convert
       private
 
       def stream_to_file(target, password)
-        success = false
+        parent = File.dirname(target)
+        parent = "." if parent.empty?
+        # Stream to a sibling temp file and rename over the target only after a clean
+        # write+close. This never truncates the target up front and never destroys a
+        # pre-existing complete file on a mid-stream failure — a download either fully
+        # replaces the target or leaves it untouched.
+        temp = create_temp(parent, target)
+
+        committed = false
         begin
-          File.open(target, "wb") do |file|
-            @transport.download(
-              @output.uri, headers(password), follow_redirects: password.nil?, sink: file
-            )
-            success = true
-          end
-        rescue SystemCallError
-          raise Api2Convert::Error, "Could not open file for writing: #{target}"
+          @transport.download(
+            @output.uri, headers(password), follow_redirects: password.nil?, sink: temp
+          )
+          # Flush + close BEFORE the rename so a truncated-on-close write can never be
+          # committed as a complete file, and a close/flush fault surfaces here rather
+          # than being swallowed on the success path.
+          temp.close
+          File.rename(temp.path, target)
+          committed = true
+        rescue SystemCallError => e
+          # A network read failure mid-stream is already a (non-retryable) NetworkError
+          # raised by the sender, which is NOT a SystemCallError and so passes straight
+          # through; reaching this rescue means a write / flush / rename fault — a
+          # genuine filesystem error.
+          raise Api2Convert::Error, "Could not write file: #{target}: #{e.message}"
         ensure
-          # Any failure (open error, network break, a refused-redirect NetworkError,
-          # a mid-stream break) leaves a partial or empty file — remove it so a
-          # truncated download can never masquerade as a complete result.
-          FileUtils.rm_f(target) unless success
+          # On any failure (network break, refused-redirect NetworkError, write/close/
+          # rename fault) only the temp file is removed; the target is never touched
+          # unless the rename already committed a complete download.
+          unless committed
+            begin
+              temp.close unless temp.closed?
+            rescue SystemCallError
+              nil
+            end
+            FileUtils.rm_f(temp.path)
+          end
         end
+      end
+
+      def create_temp(parent, target)
+        temp = Tempfile.create([".a2c-download-", ".part"], parent)
+        temp.binmode
+        temp
+      rescue SystemCallError
+        raise Api2Convert::Error, "Could not open file for writing: #{target}"
       end
 
       def resolve_password(download_password)

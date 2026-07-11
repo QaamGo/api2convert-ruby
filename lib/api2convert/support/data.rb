@@ -36,10 +36,17 @@ module Api2Convert
         end
         if value.is_a?(String)
           begin
-            return Float(value).to_i
+            parsed = Float(value)
           rescue ArgumentError, TypeError
             return nil
           end
+          # A numeric string that overflows Float to +/-Infinity (e.g. "1e400")
+          # must fall back to nil, not raise: Float::INFINITY.to_i / NAN.to_i throw
+          # FloatDomainError, and this helper must NEVER raise on a hostile payload
+          # (mirrors the Float branch's finite? guard above).
+          return nil unless parsed.finite?
+
+          return parsed.to_i
         end
         nil
       end
