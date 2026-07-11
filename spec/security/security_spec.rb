@@ -236,6 +236,71 @@ RSpec.describe "security", :security do
     end
   end
 
+  describe "control-plane response cap (real loopback)" do
+    # A hostile or buggy API server must not be able to force an unbounded in-memory
+    # read (OOM) on the control-plane (JSON / error) path. The SDK buffers that body
+    # only up to NetHttpSender::MAX_RESPONSE_BYTES (16 MiB), mirroring the shipped Go
+    # SDK's `maxResponseBytes = 16 << 20`. This proves the cap is EFFECTIVE: because
+    # Net::HTTP is read in block form, the SDK accumulates chunk-by-chunk and aborts
+    # the instant the cap is crossed — it never buffers the whole body first — unlike
+    # a `res.body`-then-check cap, which would OOM before it could fire.
+    it "rejects an over-cap API body with a typed error without buffering it whole" do
+      cap = Api2Convert::Http::NetHttpSender::MAX_RESPONSE_BYTES
+      # The server advertises and tries to stream 4x the cap. If the SDK buffered
+      # unboundedly it would drain all of it; instead it must abort after ~the cap.
+      total = cap * 4
+      port, closer, written = start_flood_server(total)
+
+      client = real_client(base_url: "http://127.0.0.1:#{port}/v2")
+      expect { client.jobs.get("j") }
+        .to raise_error(Api2Convert::NetworkError, /exceeds 16 MiB/)
+
+      # The SDK stopped reading shortly past the cap — it did NOT drain all `total`
+      # bytes into memory (socket-buffer slack allowed, but well under the flood).
+      expect(written.call).to be < (cap * 2)
+    ensure
+      closer&.call
+    end
+
+    # A raw HTTP/1.1 server that advertises `total` bytes and floods them out in
+    # 1 MiB chunks with no pause, recording how many it managed to write before the
+    # peer hangs up. Returns [port, closer, written_reader].
+    def start_flood_server(total)
+      server = TCPServer.new("127.0.0.1", 0)
+      port = server.addr[1]
+      written = 0
+      mutex = Mutex.new
+      thread = Thread.new do
+        conn = server.accept
+        while (line = conn.gets)
+          break if ["\r\n", "\n"].include?(line)
+        end
+        conn.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" \
+                   "Content-Length: #{total}\r\nConnection: close\r\n\r\n")
+        conn.flush
+        chunk = "a" * (1024 * 1024)
+        sent = 0
+        while sent < total
+          conn.write(chunk)
+          sent += chunk.bytesize
+          mutex.synchronize { written = sent }
+        end
+        conn.close
+      rescue StandardError
+        nil
+      end
+      closer = lambda do
+        begin
+          server.close
+        rescue StandardError
+          nil
+        end
+        thread.kill
+      end
+      [port, closer, -> { mutex.synchronize { written } }]
+    end
+  end
+
   describe "filesystem safety" do
     it "reduces a traversal filename to a basename that cannot escape the target directory" do
       client, sender = make_client

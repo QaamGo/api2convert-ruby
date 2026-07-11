@@ -23,6 +23,15 @@ module Api2Convert
       MAX_REDIRECTS = 5
       REDIRECT_CODES = [301, 302, 303, 307, 308].freeze
 
+      # Caps how much of a control-plane (API / error) JSON body the SDK buffers
+      # into memory, so a hostile or buggy server cannot force an unbounded read
+      # (OOM) on that path. Mirrors the shipped Go SDK's `maxResponseBytes = 16 <<
+      # 20` (transport.go), whose readAllAndClose reads through an
+      # io.LimitReader(rc, maxResponseBytes). File downloads are streamed straight
+      # to the sink (never buffered) and bounded separately, so this cap covers the
+      # buffered control-plane path only.
+      MAX_RESPONSE_BYTES = 16 * 1024 * 1024 # 16 MiB
+
       # Errors worth surfacing when they strike mid-stream (after bytes have
       # already reached the sink). They are re-raised as {NetworkError} so the
       # transport does NOT retry — replaying would re-stream the whole body and
@@ -83,7 +92,7 @@ module Api2Convert
               stream_body(res, sink)
               result = to_response(res, "")
             else
-              result = to_response(res, res.body || "")
+              result = to_response(res, read_capped_body(res))
             end
           end
         end
@@ -98,6 +107,25 @@ module Api2Convert
         end
 
         result
+      end
+
+      # Buffer a control-plane (API / error) response body into memory, bounded by
+      # {MAX_RESPONSE_BYTES}. Because `Net::HTTP` is used in block form the body is
+      # not read until this runs, so — unlike an SDK-side cap applied after a whole
+      # `res.body` — we accumulate chunk-by-chunk and abort the instant the total
+      # crosses the cap, before an over-cap body is ever fully resident. Mirrors the
+      # Go SDK's io.LimitReader-wrapped read. Only the cap is raised here; genuine
+      # transport errors propagate exactly as `res.body` would, so the retry loop
+      # still classifies them.
+      def read_capped_body(res)
+        buffer = +""
+        res.read_body do |chunk|
+          buffer << chunk
+          next unless buffer.bytesize > MAX_RESPONSE_BYTES
+
+          raise Api2Convert::NetworkError, "API response body exceeds 16 MiB"
+        end
+        buffer
       end
 
       def stream_body(res, sink)
