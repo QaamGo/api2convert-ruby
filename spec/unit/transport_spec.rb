@@ -4,7 +4,7 @@ require "stringio"
 
 RSpec.describe Api2Convert::Http::Transport do
   describe "authenticated requests" do
-    it "sends the API key in the X-Oc-Api-Key header and JSON content type on a body" do
+    it "sends the API key in the X-Api2convert-Api-Key header and JSON content type on a body" do
       client, sender = make_client
       sender.add_json(200, "id" => "job-1", "status" => { "code" => "incomplete" })
       client.jobs.create("conversion" => [{ "target" => "pdf" }])
@@ -12,7 +12,7 @@ RSpec.describe Api2Convert::Http::Transport do
       req = sender.last
       expect(req.method).to eq("POST")
       expect(req.url).to end_with("/v2/jobs")
-      expect(req.header("X-Oc-Api-Key")).to eq("test-key")
+      expect(req.header("X-Api2convert-Api-Key")).to eq("test-key")
       expect(req.header("Content-Type")).to eq("application/json")
       expect(req.header("Accept")).to eq("application/json")
       expect(req.header("User-Agent")).to match(%r{\Aapi2convert-ruby/})
@@ -171,7 +171,7 @@ RSpec.describe Api2Convert::Http::Transport do
       sink = StringIO.new
       expect do
         transport_for(client).download(
-          "https://dl.example/x", { "X-Oc-Download-Password" => "pw" },
+          "https://dl.example/x", { "X-Api2convert-Download-Password" => "pw" },
           follow_redirects: false, sink: sink
         )
       end.to raise_error(Api2Convert::NetworkError, /HTTP 302/)

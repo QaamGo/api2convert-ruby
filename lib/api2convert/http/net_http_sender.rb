@@ -13,7 +13,7 @@ module Api2Convert
     # `Net::HTTP` does not follow redirects on its own — this SDK relies on that.
     # A request only follows a 3xx when {Request#follow_redirects} is true (the
     # no-secret download path); a redirect is then re-issued as a bare GET carrying
-    # only `Accept`/`User-Agent`, so a custom `X-Oc-*` secret header can never be
+    # only `Accept`/`User-Agent`, so a custom `X-Api2convert-*` secret header can never be
     # forwarded to the redirect target.
     #
     # An {HttpSender} is any object responding to `call(request) -> Response`. Unit
@@ -98,7 +98,7 @@ module Api2Convert
         end
 
         if redirect_to
-          # Re-issue as a bare GET carrying only non-secret headers, so no X-Oc-*
+          # Re-issue as a bare GET carrying only non-secret headers, so no X-Api2convert-*
           # secret header is ever forwarded to the redirect target.
           safe = {}
           %w[Accept User-Agent].each { |k| safe[k] = headers[k] unless headers[k].nil? }

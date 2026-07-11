@@ -49,7 +49,7 @@ module Api2Convert
       def contents(download_password = nil)
         password = resolve_password(download_password)
         # A passwordless download follows storage redirects; a password-protected
-        # one must not (the X-Oc-Download-Password header could leak on a redirect).
+        # one must not (the X-Api2convert-Download-Password header could leak on a redirect).
         @transport.download(@output.uri, headers(password), follow_redirects: password.nil?)
       end
 
@@ -119,7 +119,7 @@ module Api2Convert
       end
 
       def headers(password)
-        password.nil? ? {} : { "X-Oc-Download-Password" => password }
+        password.nil? ? {} : { "X-Api2convert-Download-Password" => password }
       end
 
       def resolve_target(path_or_dir)

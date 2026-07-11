@@ -96,7 +96,7 @@ RSpec.describe Api2Convert::Result do
       sender.add_raw(200, "DATA")
       client.download(output).contents
       expect(sender.last.follow_redirects).to be(true)
-      expect(sender.last.header("X-Oc-Download-Password")).to be_nil
+      expect(sender.last.header("X-Api2convert-Download-Password")).to be_nil
     end
 
     it "sends a password-protected download WITHOUT following redirects" do
@@ -104,7 +104,7 @@ RSpec.describe Api2Convert::Result do
       sender.add_raw(200, "DATA")
       client.download(output, "s3cret").contents
       expect(sender.last.follow_redirects).to be(false)
-      expect(sender.last.header("X-Oc-Download-Password")).to eq("s3cret")
+      expect(sender.last.header("X-Api2convert-Download-Password")).to eq("s3cret")
     end
   end
 
@@ -138,11 +138,11 @@ RSpec.describe Api2Convert::Result do
       result = Api2Convert::Result::ConversionResult.new(completed_job, client_transport(client), 0, "pw")
       sender.add_raw(200, "DATA")
       result.contents
-      expect(sender.last.header("X-Oc-Download-Password")).to eq("pw")
+      expect(sender.last.header("X-Api2convert-Download-Password")).to eq("pw")
 
       sender.add_raw(200, "DATA")
       result.contents("override")
-      expect(sender.last.header("X-Oc-Download-Password")).to eq("override")
+      expect(sender.last.header("X-Api2convert-Download-Password")).to eq("override")
     end
   end
 

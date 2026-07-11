@@ -5,7 +5,7 @@ require "socket"
 # A tiny real HTTP server on 127.0.0.1, for the independent security suite. It is
 # the Ruby analog of the Node.js loopback helper / Java `SecurityTest`'s
 # `com.sun.net.httpserver` servers: only a real cross-host redirect between real
-# servers can prove the transport does not forward an `X-Oc-*` secret header to
+# servers can prove the transport does not forward an `X-Api2convert-*` secret header to
 # the redirect target (a mocked sender would short-circuit the redirect entirely).
 #
 # The block handler is called with the received (downcased) headers and returns a

@@ -10,7 +10,7 @@ module Api2Convert
     # This step is intentionally hand-written — it is NOT described by the OpenAPI
     # spec. It posts a `multipart/form-data` body (field `file`) to
     # `{job.server}/upload-file/{job.id}` and authenticates with the per-job
-    # `X-Oc-Token` header — never the account API key. The body is streamed, so
+    # `X-Api2convert-Token` header — never the account API key. The body is streamed, so
     # large files are not read into memory. Internal.
     class FileUploader
       def initialize(transport)
@@ -39,7 +39,7 @@ module Api2Convert
           @transport.build_request(
             "POST", url,
             headers: {
-              "X-Oc-Token" => token,
+              "X-Api2convert-Token" => token,
               "Content-Type" => "multipart/form-data; boundary=#{boundary}"
             },
             body_stream: body_stream,

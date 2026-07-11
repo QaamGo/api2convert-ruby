@@ -11,7 +11,7 @@ module Api2Convert
     class Request
       attr_reader :method, :url, :headers, :body, :body_stream, :content_length, :response_sink
       # Whether the sender may follow a 3xx redirect. Set by the transport per
-      # request: authenticated requests carry a secret in a custom `X-Oc-*` header,
+      # request: authenticated requests carry a secret in a custom `X-Api2convert-*` header,
       # so they must NOT follow redirects (the header could leak to another host).
       attr_accessor :follow_redirects
 
@@ -29,12 +29,14 @@ module Api2Convert
         @response_sink = response_sink
       end
 
-      # Redacted representation — {#headers} carries the raw `X-Oc-Api-Key` /
-      # `X-Oc-Download-Password` secrets, so the default `#inspect` would print
-      # them in cleartext in a log line or a backtrace. Mask every `X-Oc-*` value.
+      # Redacted representation — {#headers} carries the raw `X-Api2convert-Api-Key` /
+      # `X-Api2convert-Download-Password` secrets, so the default `#inspect` would print
+      # them in cleartext in a log line or a backtrace. Mask every `X-Api2convert-*` value
+      # (and the legacy `X-Oc-*` prefix, so a redaction gap can never open up).
       def inspect
         safe = @headers.to_h do |key, value|
-          [key, key.to_s.downcase.start_with?("x-oc-") ? Support::Secret.mask(value) : value]
+          secret = key.to_s.downcase.start_with?("x-api2convert-", "x-oc-")
+          [key, secret ? Support::Secret.mask(value) : value]
         end
         "#<#{self.class.name} method=#{@method.inspect} url=#{@url.inspect} headers=#{safe.inspect}>"
       end

@@ -61,7 +61,7 @@ module Api2Convert
 
       # Perform an authenticated JSON request and return the decoded body.
       def request(method, path, body = nil, query = nil, headers = nil)
-        request_headers = { "X-Oc-Api-Key" => @config.api_key }
+        request_headers = { "X-Api2convert-Api-Key" => @config.api_key }
         request_headers.merge!(headers) unless headers.nil?
         content = nil
         unless body.nil?
@@ -83,7 +83,7 @@ module Api2Convert
       # a non-seekable body so it is sent once.
       #
       # +follow_redirects+ defaults to false: authenticated requests carry a secret
-      # in a custom `X-Oc-*` header, which a redirect could leak to another host.
+      # in a custom `X-Api2convert-*` header, which a redirect could leak to another host.
       # Only the self-contained download path (no account key) opts in.
       def send_request(build, replayable: true, follow_redirects: false)
         attempt = 0
@@ -125,7 +125,7 @@ module Api2Convert
       def interpret(response)
         ensure_successful(response)
 
-        # Every API request rides the no-follow path (secrets travel in X-Oc-* headers), so a 3xx
+        # Every API request rides the no-follow path (secrets travel in X-Api2convert-* headers), so a 3xx
         # passes ensure_successful (status < 400) but was deliberately not followed; decoding its
         # body would yield an empty model. Surface it as a typed error instead.
         status = response.status

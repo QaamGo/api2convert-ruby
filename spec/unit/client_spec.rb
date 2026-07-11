@@ -63,7 +63,7 @@ RSpec.describe Api2Convert::Client do
       methods = sender.requests.map(&:method)
       expect(methods).to eq(%w[POST POST PATCH GET])
       expect(sender.requests.first.json["process"]).to be(false)
-      expect(sender.requests[1].header("X-Oc-Token")).to eq("tok")
+      expect(sender.requests[1].header("X-Api2convert-Token")).to eq("tok")
       expect(sender.requests[2].json).to eq("process" => true)
       expect(result.job).to be_completed
     end

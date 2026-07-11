@@ -46,7 +46,7 @@ RSpec.describe "security", :security do
       expect(error.message).not_to include(secret)
       expect(Array(error.backtrace).join("\n")).not_to include(secret)
       # ...but the key WAS sent as the auth header (the request was authenticated).
-      expect(sender.last.header("X-Oc-Api-Key")).to eq(secret)
+      expect(sender.last.header("X-Api2convert-Api-Key")).to eq(secret)
     end
 
     it "masks secrets in #inspect / #to_s so `p client` never prints them in cleartext" do
@@ -91,7 +91,7 @@ RSpec.describe "security", :security do
 
   describe "redirect policy (real loopback servers)" do
     it "does not forward the account key across a cross-host redirect" do
-      evil = start_server { |headers| { status: 200, body: "grabbed:#{headers["x-oc-api-key"]}" } }
+      evil = start_server { |headers| { status: 200, body: "grabbed:#{headers["x-api2convert-api-key"]}" } }
       api = start_server { |_headers| { status: 302, headers: { "Location" => "#{evil.url}/steal" } } }
 
       client = real_client(base_url: "#{api.url}/v2")
@@ -100,7 +100,7 @@ RSpec.describe "security", :security do
 
       expect(evil.hits).to eq(0)
       expect(api.hits).to eq(1)
-      expect(api.headers_received.first["x-oc-api-key"]).to eq("secret-key")
+      expect(api.headers_received.first["x-api2convert-api-key"]).to eq("secret-key")
     end
 
     it "follows storage redirects for a passwordless download" do
@@ -127,8 +127,8 @@ RSpec.describe "security", :security do
       end
 
       seen = upload_srv.headers_received.first
-      expect(seen["x-oc-token"]).to eq("tok-abc")
-      expect(seen["x-oc-api-key"]).to be_nil
+      expect(seen["x-api2convert-token"]).to eq("tok-abc")
+      expect(seen["x-api2convert-api-key"]).to be_nil
       expect(evil.hits).to eq(0)
     end
 
@@ -143,7 +143,7 @@ RSpec.describe "security", :security do
       end
 
       expect(evil.hits).to eq(0)
-      leaked = evil.headers_received.any? { |h| h.key?("x-oc-download-password") }
+      leaked = evil.headers_received.any? { |h| h.key?("x-api2convert-download-password") }
       expect(leaked).to be(false)
     end
 

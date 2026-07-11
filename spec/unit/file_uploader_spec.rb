@@ -22,8 +22,8 @@ RSpec.describe Api2Convert::Upload::FileUploader do
     req = sender.last
     expect(req.method).to eq("POST")
     expect(req.url).to eq("https://up.example.test/upload-file/job-9")
-    expect(req.header("X-Oc-Token")).to eq("tok-abc")
-    expect(req.header("X-Oc-Api-Key")).to be_nil
+    expect(req.header("X-Api2convert-Token")).to eq("tok-abc")
+    expect(req.header("X-Api2convert-Api-Key")).to be_nil
     expect(req.header("Content-Type")).to start_with("multipart/form-data; boundary=")
     expect(req.follow_redirects).to be(false)
     expect(req.body).to include("hello world")

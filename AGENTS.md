@@ -63,7 +63,7 @@ junior-friendly surface — one-call `convert` — and use AI to keep it current
   key/token in errors. Secret-scan before any release.
 - **The contract is law.** Public method names, signatures and semantics match `docs/SDK_CONTRACT.md`
   across every SDK language. Adapt only to Ruby idiom (see divergences below).
-- **Upload uses the per-job `X-Oc-Token`, never the account key.** There is a spec for this.
+- **Upload uses the per-job `X-Api2convert-Token`, never the account key.** There is a spec for this.
 - **Secret-bearing requests never follow redirects.** The key/token/download-password ride in custom
   `X-Oc-*` headers. `Net::HTTP` does not follow redirects by default — the SDK relies on that and
   only opts the no-secret download path into following redirects. `spec/security` proves the
