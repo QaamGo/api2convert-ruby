@@ -30,11 +30,17 @@ module Api2Convert
         credential passphrase sas sig signature
       ].freeze
 
+      # Precompiled union: a key is sensitive iff it *contains* any substring
+      # above. Equivalent to `SENSITIVE_SUBSTRINGS.any? { |s| key.include?(s) }`
+      # but written as a regex so Style/ArrayIntersect can't rewrite the
+      # String#include? substring test into Array#intersect? (which would need an
+      # array argument and change the semantics).
+      SENSITIVE_PATTERN = Regexp.union(SENSITIVE_SUBSTRINGS).freeze
+
       # Whether a key name marks its value as sensitive (case-insensitive
       # substring match). Accepts String or Symbol keys.
       def sensitive_key?(key)
-        lower = key.to_s.downcase
-        SENSITIVE_SUBSTRINGS.any? { |needle| lower.include?(needle) }
+        SENSITIVE_PATTERN.match?(key.to_s.downcase)
       end
 
       # Mask sensitive leaves of a `parameters` map: any key matching
