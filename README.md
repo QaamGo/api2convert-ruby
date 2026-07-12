@@ -87,6 +87,35 @@ rescue Api2Convert::SignatureVerificationError
 end
 ```
 
+## Cloud storage
+
+Read an input straight from your own cloud storage, and/or deliver the output
+into a bucket — no local upload or download in between (shipped in 10.3.0).
+
+```ruby
+# Input from S3: import the source and save the converted result locally
+input = Api2Convert::Model::CloudInput.amazon_s3(
+  bucket:          "my-bucket",
+  file:            "invoices/report.docx",
+  accesskeyid:     "AKIA…",
+  secretaccesskey: "…"
+)
+client.convert(input, "pdf").save("report.pdf")
+
+# Output to S3: deliver the result into a bucket (generic OutputTarget)
+target = Api2Convert::Model::OutputTarget.of(
+  Api2Convert::CloudProvider::AMAZON_S3,
+  parameters:  { "bucket" => "my-bucket", "file" => "out/report.pdf" },
+  credentials: { "accesskeyid" => "AKIA…", "secretaccesskey" => "…" }
+)
+client.convert("report.docx", "pdf", output_targets: [target])
+# Delivered to the bucket — the job completes with no local output to save.
+```
+
+`azure`, `ftp` and `google_cloud` have matching input factories; output uses the
+generic `OutputTarget` for every provider. Credentials are redacted in
+`inspect`/errors and never printed.
+
 ## Error handling
 
 ```ruby
