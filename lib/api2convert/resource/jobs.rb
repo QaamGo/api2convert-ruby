@@ -52,10 +52,14 @@ module Api2Convert
       end
 
       # Attach an input by descriptor, e.g. a remote URL:
-      # `add_input(job_id, { "type" => "remote", "source" => "https://..." })`.
+      # `add_input(job_id, { "type" => "remote", "source" => "https://..." })`,
+      # a Google Drive picker
+      # (`{ "type" => "gdrive_picker", "source" => file_id, "credentials" => { "token" => ... } }`),
+      # or a {Model::CloudInput} builder.
       def add_input(job_id, descriptor)
+        payload = descriptor.is_a?(Model::CloudInput) ? descriptor.to_h : descriptor
         Model::InputFile.from_hash(
-          @transport.request("POST", "/jobs/#{Support::Data.encode_segment(job_id)}/input", descriptor)
+          @transport.request("POST", "/jobs/#{Support::Data.encode_segment(job_id)}/input", payload)
         )
       end
 

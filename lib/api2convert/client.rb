@@ -57,9 +57,18 @@ module Api2Convert
     # remembered and applied automatically on download.
     #
     # @return [Result::ConversionResult]
+    # A {Model::CloudInput} imports the source straight from customer storage (a
+    # started job, like a remote URL). Pass +output_targets+ (a list of
+    # {Model::OutputTarget}) to deliver the output(s) to customer storage instead
+    # of producing a downloadable file — the job then completes with **no** local
+    # output and the returned result is not downloaded (calling `output`/`save`
+    # on it would have nothing to fetch). Output targets are attached to the
+    # conversion's `output_target` and never merged into +options+.
     def convert(source, to, options = nil, category: nil, timeout: nil,
-                output_index: nil, filename: nil, download_password: nil)
-      job = start_conversion(source, to, options, category, nil, filename, download_password)
+                output_index: nil, filename: nil, download_password: nil,
+                output_targets: nil)
+      job = start_conversion(source, to, options, category, nil, filename,
+                             download_password, output_targets)
       done = @jobs.wait(job.id, timeout)
       Result::ConversionResult.new(done, @transport, output_index.nil? ? 0 : output_index, download_password)
     end
@@ -71,8 +80,9 @@ module Api2Convert
     #
     # @return [Model::Job]
     def convert_async(source, to, options = nil, callback: nil, category: nil,
-                      filename: nil, download_password: nil)
-      start_conversion(source, to, options, category, callback, filename, download_password)
+                      filename: nil, download_password: nil, output_targets: nil)
+      start_conversion(source, to, options, category, callback, filename,
+                       download_password, output_targets)
     end
 
     # A {Result::FileDownload} for an output file. A +download_password+ is
@@ -112,10 +122,16 @@ module Api2Convert
 
     private
 
-    def start_conversion(source, to, options, category, callback, filename, download_password)
+    def start_conversion(source, to, options, category, callback, filename,
+                         download_password, output_targets = nil)
       conversion = { "target" => to }
       conversion["category"] = category unless category.nil?
       conversion["options"] = options if !options.nil? && !options.empty?
+      # Cloud delivery targets attach to the conversion's `output_target` — never
+      # merged into the options map.
+      unless output_targets.nil? || output_targets.empty?
+        conversion["output_target"] = Array(output_targets).map(&:to_h)
+      end
 
       payload = { "conversion" => [conversion] }
       unless callback.nil?
@@ -123,6 +139,14 @@ module Api2Convert
         payload["notify_status"] = true
       end
       payload["download_passwords"] = [download_password] unless download_password.nil?
+
+      # A cloud input imports from customer storage — a started job with the
+      # descriptor inline, exactly like a remote URL (never staged/uploaded).
+      if source.is_a?(Model::CloudInput)
+        payload["process"] = true
+        payload["input"] = [source.to_h]
+        return @jobs.create(payload)
+      end
 
       if source.is_a?(String) && source =~ URL_RE
         payload["process"] = true

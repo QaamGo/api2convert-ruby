@@ -152,7 +152,13 @@ module Api2Convert
         status = response.status
         return if status < 400
 
-        body = decode_safe(response)
+        # Belt-and-suspenders: deep-redact the decoded error body before it lands
+        # on the exception. Cloud credentials ride in the plaintext request body;
+        # the API only ever echoes field *names* (never a value), but a future
+        # server/proxy change must not be able to surface a secret through
+        # `error.body`. The `message` is server-provided text, never derived from
+        # the request body.
+        body = Support::Redactor.redact_body(decode_safe(response))
         api_message = body["message"]
         message = api_message.is_a?(String) ? api_message : fallback_message(response)
         request_id = response.header("x-request-id")
