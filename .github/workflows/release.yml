@@ -32,7 +32,7 @@ jobs:
       id-token: write # OIDC token for Trusted Publishing (mandatory; no stored secret)
       contents: write # release-gem may push the git tag ref (a no-op here since the tag already exists)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
