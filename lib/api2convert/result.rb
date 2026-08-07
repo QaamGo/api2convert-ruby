@@ -128,7 +128,7 @@ module Api2Convert
                          path_or_dir.end_with?(File::SEPARATOR)
         if looks_like_dir
           name = safe_name(@output.filename) || safe_name(@output.id) || "output"
-          return File.join(path_or_dir.sub(%r{[/\\]+\z}, ""), name)
+          return File.join(Support::Strings.trim_trailing(path_or_dir, "/\\"), name)
         end
         path_or_dir
       end

@@ -41,7 +41,7 @@ module Api2Convert
 
       new(
         api_key: api_key,
-        base_url: (base_url.nil? ? DEFAULT_BASE_URL : base_url).sub(%r{/+\z}, ""),
+        base_url: Support::Strings.trim_trailing(base_url.nil? ? DEFAULT_BASE_URL : base_url, "/"),
         timeout: [1, (timeout.nil? ? 30 : timeout).to_i].max,
         max_retries: [0, (max_retries.nil? ? 2 : max_retries).to_i].max,
         poll_interval: interval,

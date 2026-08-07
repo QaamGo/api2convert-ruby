@@ -29,7 +29,7 @@ module Api2Convert
 
         io, resolved_name, opened = resolve(file, filename)
         seekable = io.respond_to?(:rewind)
-        url = "#{job.server.sub(%r{/+\z}, "")}/upload-file/#{job.id}"
+        url = "#{Support::Strings.trim_trailing(job.server, "/")}/upload-file/#{job.id}"
         token = job.token
         boundary = "----Api2Convert#{SecureRandom.hex(16)}"
 
