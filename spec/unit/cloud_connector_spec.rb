@@ -234,8 +234,10 @@ RSpec.describe "cloud connectors" do
     end
 
     it "freezes the value objects" do
-      expect(Api2Convert::Model::CloudInput.azure(container: "c", file: "f", accountname: "n", accountkey: "k"))
-        .to be_frozen
+      azure_input = Api2Convert::Model::CloudInput.azure(
+        container: "c", file: "f", accountname: "n", accountkey: "k"
+      )
+      expect(azure_input).to be_frozen
       expect(Api2Convert::Model::OutputTarget.new(type: "azure")).to be_frozen
     end
   end
