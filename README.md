@@ -112,7 +112,7 @@ client.convert("report.docx", "pdf", output_targets: [target])
 # Delivered to the bucket — the job completes with no local output to save.
 ```
 
-`azure`, `ftp` and `google_cloud` have matching input factories; output uses the
+`azure` and `google_cloud` have matching input factories; output uses the
 generic `OutputTarget` for every provider. Credentials are redacted in
 `inspect`/errors and never printed.
 

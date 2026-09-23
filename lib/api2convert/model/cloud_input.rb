@@ -63,15 +63,6 @@ module Api2Convert
         )
       end
 
-      # Import from an FTP server.
-      def self.ftp(host:, file:, username:, password:, parameters: {}, credentials: {})
-        new(
-          source: CloudProvider::FTP,
-          parameters: { "host" => host, "file" => file }.merge(parameters),
-          credentials: { "username" => username, "password" => password }.merge(credentials)
-        )
-      end
-
       # Import from Google Cloud Storage.
       def self.google_cloud(projectid:, bucket:, file:, keyfile:, parameters: {}, credentials: {})
         new(

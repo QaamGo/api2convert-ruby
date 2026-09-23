@@ -12,18 +12,17 @@ module Api2Convert
   # there is deliberately no strict parse.
   #
   # Import support (a {Model::CloudInput} factory) exists for {AMAZON_S3},
-  # {AZURE}, {FTP} and {GOOGLE_CLOUD}. {GDRIVE} and {YOUTUBE} are **output-only**
+  # {AZURE} and {GOOGLE_CLOUD}. {GDRIVE} and {YOUTUBE} are **output-only**
   # (they validate as an output `type` but have no downloader); Google Drive
   # *input* uses the separate `gdrive_picker` input type.
   module CloudProvider
     AMAZON_S3 = "amazons3"
     AZURE = "azure"
-    FTP = "ftp"
     GDRIVE = "gdrive"
     GOOGLE_CLOUD = "googlecloud"
     YOUTUBE = "youtube"
 
     # The full provider vocabulary, in canonical order.
-    ALL = [AMAZON_S3, AZURE, FTP, GDRIVE, GOOGLE_CLOUD, YOUTUBE].freeze
+    ALL = [AMAZON_S3, AZURE, GDRIVE, GOOGLE_CLOUD, YOUTUBE].freeze
   end
 end

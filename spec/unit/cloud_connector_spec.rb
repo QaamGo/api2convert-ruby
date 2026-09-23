@@ -14,9 +14,9 @@ RSpec.describe "cloud connectors" do
 
   # The exact output_target descriptor fixture 1 expects — note: no `status` key.
   expected_output_target = {
-    "type" => "ftp",
-    "parameters" => { "host" => "ftp.example.com", "file" => "/out/photo.jpg" },
-    "credentials" => { "username" => "u", "password" => "p" }
+    "type" => "azure",
+    "parameters" => { "container" => "out-container", "file" => "/out/photo.jpg" },
+    "credentials" => { "accountname" => "n", "accountkey" => "k" }
   }.freeze
 
   # ---- Fixture 1: create-payload (what convert() serializes) -----------------
@@ -33,9 +33,9 @@ RSpec.describe "cloud connectors" do
         accesskeyid: "AKIA_TEST", secretaccesskey: "SECRET_TEST"
       )
       target = Api2Convert::Model::OutputTarget.new(
-        type: "ftp",
-        parameters: { "host" => "ftp.example.com", "file" => "/out/photo.jpg" },
-        credentials: { "username" => "u", "password" => "p" }
+        type: "azure",
+        parameters: { "container" => "out-container", "file" => "/out/photo.jpg" },
+        credentials: { "accountname" => "n", "accountkey" => "k" }
       )
 
       client.convert(input, "jpg", output_targets: [target])
@@ -68,9 +68,9 @@ RSpec.describe "cloud connectors" do
           "target" => "jpg",
           "output_target" => [
             Api2Convert::Model::OutputTarget.of(
-              Api2Convert::CloudProvider::FTP,
-              parameters: { "host" => "ftp.example.com", "file" => "/out/photo.jpg" },
-              credentials: { "username" => "u", "password" => "p" }
+              Api2Convert::CloudProvider::AZURE,
+              parameters: { "container" => "out-container", "file" => "/out/photo.jpg" },
+              credentials: { "accountname" => "n", "accountkey" => "k" }
             ).to_h
           ]
         }]
@@ -84,20 +84,20 @@ RSpec.describe "cloud connectors" do
 
     it "accepts a CloudInput builder in jobs.add_input" do
       client, sender = make_client
-      sender.add_json(200, "id" => "in-1", "type" => "cloud", "source" => "ftp")
+      sender.add_json(200, "id" => "in-1", "type" => "cloud", "source" => "azure")
 
       client.jobs.add_input(
         "job-1",
-        Api2Convert::Model::CloudInput.ftp(
-          host: "ftp.example.com", file: "in/a.png", username: "u", password: "p"
+        Api2Convert::Model::CloudInput.azure(
+          container: "in-container", file: "in/a.png", accountname: "n", accountkey: "k"
         )
       )
 
       body = sender.requests.first.json
       expect(body["type"]).to eq("cloud")
-      expect(body["source"]).to eq("ftp")
-      expect(body["parameters"]).to eq("host" => "ftp.example.com", "file" => "in/a.png")
-      expect(body["credentials"]).to eq("username" => "u", "password" => "p")
+      expect(body["source"]).to eq("azure")
+      expect(body["parameters"]).to eq("container" => "in-container", "file" => "in/a.png")
+      expect(body["credentials"]).to eq("accountname" => "n", "accountkey" => "k")
     end
   end
 
@@ -116,8 +116,8 @@ RSpec.describe "cloud connectors" do
         "conversion" => [{
           "id" => "c-1", "target" => "jpg",
           "output_target" => [{
-            "type" => "ftp",
-            "parameters" => { "host" => "ftp.example.com", "file" => "/out/photo.jpg" },
+            "type" => "azure",
+            "parameters" => { "container" => "out-container", "file" => "/out/photo.jpg" },
             "credentials" => {}, "status" => "uploading"
           }]
         }]
@@ -131,9 +131,9 @@ RSpec.describe "cloud connectors" do
 
       # 2) output target status/parameters/type surface.
       out = job.conversion.first.output_targets.first
-      expect(out.type).to eq("ftp")
+      expect(out.type).to eq("azure")
       expect(out.status).to eq("uploading")
-      expect(out.parameters).to eq("host" => "ftp.example.com", "file" => "/out/photo.jpg")
+      expect(out.parameters).to eq("container" => "out-container", "file" => "/out/photo.jpg")
 
       # 3) credentials are never surfaced (API returns them empty; SDK doesn't hydrate).
       expect(out.credentials).to eq({})
@@ -154,14 +154,32 @@ RSpec.describe "cloud connectors" do
       expect(job.conversion.first.output_targets.first.type).to eq("r2")
       expect(job.conversion.first.output_targets.first.status).to eq("waiting")
     end
+
+    it "still hydrates the retired ftp provider on historical jobs" do
+      # `ftp` is no longer build-side vocabulary, but the API still returns it on jobs
+      # created before it was retired. Reads stay raw strings so those jobs still hydrate.
+      job = Api2Convert::Model::Job.from_hash(
+        "id" => "job-1",
+        "status" => { "code" => "completed" },
+        "input" => [{ "id" => "in-1", "type" => "cloud", "source" => "ftp", "status" => "ready" }],
+        "conversion" => [{
+          "target" => "jpg",
+          "output_target" => [{ "type" => "ftp", "status" => "completed" }]
+        }]
+      )
+
+      expect(job.input.first.source).to eq("ftp")
+      expect(job.conversion.first.output_targets.first.type).to eq("ftp")
+      expect(Api2Convert::CloudProvider::ALL).not_to include("ftp")
+    end
   end
 
   # ---- Unit: the new value types ---------------------------------------------
 
   describe "cloud value types" do
-    it "exposes the six-value provider vocabulary in canonical order" do
+    it "exposes the five-value provider vocabulary in canonical order" do
       expect(Api2Convert::CloudProvider::ALL).to eq(
-        %w[amazons3 azure ftp gdrive googlecloud youtube]
+        %w[amazons3 azure gdrive googlecloud youtube]
       )
     end
 
@@ -203,22 +221,22 @@ RSpec.describe "cloud connectors" do
 
     it "omits status on serialize but hydrates it on read" do
       created = Api2Convert::Model::OutputTarget.new(
-        type: "ftp", parameters: { "host" => "h" }, credentials: { "username" => "u" },
+        type: "azure", parameters: { "container" => "c" }, credentials: { "accountkey" => "k" },
         status: "completed"
       )
       expect(created.to_h).not_to have_key("status")
 
       read = Api2Convert::Model::OutputTarget.from_hash(
-        "type" => "ftp", "parameters" => { "host" => "h" }, "status" => "completed"
+        "type" => "azure", "parameters" => { "container" => "c" }, "status" => "completed"
       )
       expect(read.status).to eq("completed")
       expect(read.credentials).to eq({})
     end
 
     it "freezes the value objects" do
-      expect(Api2Convert::Model::CloudInput.ftp(host: "h", file: "f", username: "u", password: "p"))
+      expect(Api2Convert::Model::CloudInput.azure(container: "c", file: "f", accountname: "n", accountkey: "k"))
         .to be_frozen
-      expect(Api2Convert::Model::OutputTarget.new(type: "ftp")).to be_frozen
+      expect(Api2Convert::Model::OutputTarget.new(type: "azure")).to be_frozen
     end
   end
 end

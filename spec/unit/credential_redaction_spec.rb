@@ -27,8 +27,8 @@ RSpec.describe "credential redaction" do
 
     it "masks the whole credentials object of an OutputTarget" do
       target = Api2Convert::Model::OutputTarget.of(
-        Api2Convert::CloudProvider::FTP,
-        parameters: { "host" => "ftp.example.com" },
+        Api2Convert::CloudProvider::AZURE,
+        parameters: { "container" => "out-container" },
         credentials: { "username" => "u", "password" => secret }
       )
 
