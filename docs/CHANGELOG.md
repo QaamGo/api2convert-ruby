@@ -4,6 +4,14 @@ All notable changes to the API2Convert Ruby SDK are documented here. The five
 official SDKs (PHP, Python, Java, Node.js, Ruby) version together against the
 shared [`SDK_CONTRACT.md`](SDK_CONTRACT.md).
 
+## [10.3.3] - 2026-11-06
+
+### Removed
+
+- The FTP cloud provider, because FTP is being retired from the API: `CloudInput.ftp` and
+  `CloudProvider::FTP`. Code that uses them raises `NoMethodError` or `NameError` and needs another
+  provider. Reading stays tolerant: jobs created with `ftp` earlier still load.
+
 ## [10.3.2] - 2026-08-12
 
 ### Fixed
